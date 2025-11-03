@@ -81,14 +81,14 @@
 ### 方法一：一键安装（推荐）
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/yourusername/server-scripts/main/quick_install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/qfpqhyl/server-scripts/main/quick_install.sh | bash
 ```
 
 ### 方法二：分模块安装
 
 ```bash
 # 克隆仓库
-git clone https://github.com/yourusername/server-scripts.git
+git clone https://github.com/qfpqhyl/server-scripts.git
 cd server-scripts
 
 # 运行主安装脚本
