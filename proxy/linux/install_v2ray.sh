@@ -154,14 +154,16 @@ select_proxy_mode() {
     print_menu "选择代理模式"
     echo ""
     echo "1) 本机代理 (仅本机使用)"
-    echo "   - SOCKS5: 127.0.0.1:1080"
-    echo "   - HTTP:   127.0.0.1:8080"
+    echo "   - SOCKS5: 127.0.0.1:[自定义端口]"
+    echo "   - HTTP:   127.0.0.1:[自定义端口]"
     echo "   - 更安全，仅限本机访问"
     echo ""
     echo "2) 局域网共享 (局域网内其他设备可使用)"
-    echo "   - SOCKS5: 0.0.0.0:1080"
-    echo "   - HTTP:   0.0.0.0:8080"
+    echo "   - SOCKS5: 0.0.0.0:[自定义端口]"
+    echo "   - HTTP:   0.0.0.0:[自定义端口]"
     echo "   - 需要设置用户名密码认证"
+    echo ""
+    echo "📝 后续可自定义设置端口号"
     echo ""
 
     while true; do
@@ -193,11 +195,109 @@ select_proxy_mode() {
         esac
     done
 
+    # 初始化默认端口
+    SOCKS5_PORT="1080"
+    HTTP_PORT="8080"
+
+    # 设置端口配置
+    setup_port_config
+
     # 保存代理模式配置
+    save_proxy_config
+}
+
+# 设置端口配置
+setup_port_config() {
+    echo ""
+    print_info "配置代理端口"
+    print_warning "请确保端口未被占用，推荐使用1024以上的端口"
+    echo ""
+
+    # 设置SOCKS5端口
+    while true; do
+        read -p "请输入SOCKS5代理端口 [默认: 1080]: " SOCKS5_PORT_INPUT
+        if [[ -z "$SOCKS5_PORT_INPUT" ]]; then
+            SOCKS5_PORT="1080"
+        else
+            # 验证端口格式
+            if [[ ! "$SOCKS5_PORT_INPUT" =~ ^[0-9]+$ ]]; then
+                print_warning "端口必须是数字"
+                continue
+            fi
+            if [[ "$SOCKS5_PORT_INPUT" -lt 1 || "$SOCKS5_PORT_INPUT" -gt 65535 ]]; then
+                print_warning "端口范围必须在1-65535之间"
+                continue
+            fi
+            if [[ "$SOCKS5_PORT_INPUT" -lt 1024 ]]; then
+                print_warning "建议使用1024以上的端口避免权限问题"
+                read -p "是否继续使用端口 $SOCKS5_PORT_INPUT? (y/N): " -n 1 -r
+                echo
+                if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                    continue
+                fi
+            fi
+            SOCKS5_PORT="$SOCKS5_PORT_INPUT"
+        fi
+        break
+    done
+
+    # 设置HTTP端口
+    while true; do
+        read -p "请输入HTTP代理端口 [默认: 8080]: " HTTP_PORT_INPUT
+        if [[ -z "$HTTP_PORT_INPUT" ]]; then
+            HTTP_PORT="8080"
+        else
+            # 验证端口格式
+            if [[ ! "$HTTP_PORT_INPUT" =~ ^[0-9]+$ ]]; then
+                print_warning "端口必须是数字"
+                continue
+            fi
+            if [[ "$HTTP_PORT_INPUT" -lt 1 || "$HTTP_PORT_INPUT" -gt 65535 ]]; then
+                print_warning "端口范围必须在1-65535之间"
+                continue
+            fi
+            if [[ "$HTTP_PORT_INPUT" -lt 1024 ]]; then
+                print_warning "建议使用1024以上的端口避免权限问题"
+                read -p "是否继续使用端口 $HTTP_PORT_INPUT? (y/N): " -n 1 -r
+                echo
+                if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                    continue
+                fi
+            fi
+            if [[ "$HTTP_PORT_INPUT" == "$SOCKS5_PORT" ]]; then
+                print_warning "HTTP端口不能与SOCKS5端口相同"
+                continue
+            fi
+            HTTP_PORT="$HTTP_PORT_INPUT"
+        fi
+        break
+    done
+
+    print_success "端口配置完成"
+    print_info "SOCKS5端口: $SOCKS5_PORT"
+    print_info "HTTP端口: $HTTP_PORT"
+
+    # 端口占用检查
+    echo ""
+    print_info "检查端口占用情况..."
+    if command -v netstat >/dev/null 2>&1; then
+        if netstat -tln 2>/dev/null | grep -q ":$SOCKS5_PORT "; then
+            print_warning "端口 $SOCKS5_PORT 可能已被占用"
+        fi
+        if netstat -tln 2>/dev/null | grep -q ":$HTTP_PORT "; then
+            print_warning "端口 $HTTP_PORT 可能已被占用"
+        fi
+    fi
+}
+
+# 保存代理模式配置
+save_proxy_config() {
     cat > proxy_config.txt << EOF
 PROXY_MODE=$PROXY_MODE
 LISTEN_IP=$LISTEN_IP
 AUTH_TYPE=$AUTH_TYPE
+SOCKS5_PORT=$SOCKS5_PORT
+HTTP_PORT=$HTTP_PORT
 EOF
 
     if [[ "$AUTH_TYPE" == "password" ]]; then
@@ -542,7 +642,7 @@ def parse_shadowsocks(ss_url):
     except Exception as e:
         return None
 
-def create_v2ray_config_shadowsocks(ss_config, proxy_mode="local", listen_ip="127.0.0.1", auth_type="noauth", auth_user=None, auth_pass=None):
+def create_v2ray_config_shadowsocks(ss_config, proxy_mode="local", listen_ip="127.0.0.1", auth_type="noauth", auth_user=None, auth_pass=None, socks5_port=1080, http_port=8080):
     """为Shadowsocks创建V2Ray配置"""
     # 根据代理模式配置认证
     socks_settings = {"udp": False}
@@ -573,14 +673,14 @@ def create_v2ray_config_shadowsocks(ss_config, proxy_mode="local", listen_ip="12
         },
         "inbounds": [{
             "tag": "socks",
-            "port": 1080,
+            "port": socks5_port,
             "listen": listen_ip,
             "protocol": "socks",
             "sniffing": {"enabled": True, "destOverride": ["http", "tls"]},
             "settings": socks_settings
         }, {
             "tag": "http",
-            "port": 8080,
+            "port": http_port,
             "listen": listen_ip,
             "protocol": "http",
             "sniffing": {"enabled": True, "destOverride": ["http", "tls"]},
@@ -612,7 +712,7 @@ def create_v2ray_config_shadowsocks(ss_config, proxy_mode="local", listen_ip="12
         }
     }
 
-def create_v2ray_config_vless(vless_config, proxy_mode="local", listen_ip="127.0.0.1", auth_type="noauth", auth_user=None, auth_pass=None):
+def create_v2ray_config_vless(vless_config, proxy_mode="local", listen_ip="127.0.0.1", auth_type="noauth", auth_user=None, auth_pass=None, socks5_port=1080, http_port=8080):
     """为VLESS创建V2Ray配置"""
     # 根据代理模式配置认证
     socks_settings = {"udp": False}
@@ -643,14 +743,14 @@ def create_v2ray_config_vless(vless_config, proxy_mode="local", listen_ip="127.0
         },
         "inbounds": [{
             "tag": "socks",
-            "port": 1080,
+            "port": socks5_port,
             "listen": listen_ip,
             "protocol": "socks",
             "sniffing": {"enabled": True, "destOverride": ["http", "tls"]},
             "settings": socks_settings
         }, {
             "tag": "http",
-            "port": 8080,
+            "port": http_port,
             "listen": listen_ip,
             "protocol": "http",
             "sniffing": {"enabled": True, "destOverride": ["http", "tls"]},
@@ -688,7 +788,7 @@ def create_v2ray_config_vless(vless_config, proxy_mode="local", listen_ip="127.0
         }
     }
 
-def create_v2ray_config_vmess(vmess_config, proxy_mode="local", listen_ip="127.0.0.1", auth_type="noauth", auth_user=None, auth_pass=None):
+def create_v2ray_config_vmess(vmess_config, proxy_mode="local", listen_ip="127.0.0.1", auth_type="noauth", auth_user=None, auth_pass=None, socks5_port=1080, http_port=8080):
     """为VMess创建V2Ray配置"""
     # 根据代理模式配置认证
     socks_settings = {"udp": False}
@@ -719,14 +819,14 @@ def create_v2ray_config_vmess(vmess_config, proxy_mode="local", listen_ip="127.0
         },
         "inbounds": [{
             "tag": "socks",
-            "port": 1080,
+            "port": socks5_port,
             "listen": listen_ip,
             "protocol": "socks",
             "sniffing": {"enabled": True, "destOverride": ["http", "tls"]},
             "settings": socks_settings
         }, {
             "tag": "http",
-            "port": 8080,
+            "port": http_port,
             "listen": listen_ip,
             "protocol": "http",
             "sniffing": {"enabled": True, "destOverride": ["http", "tls"]},
@@ -795,6 +895,8 @@ def generate_config_for_server(server_index):
     auth_type = "noauth"
     auth_user = None
     auth_pass = None
+    socks5_port = 1080
+    http_port = 8080
 
     try:
         with open('proxy_config.txt', 'r') as f:
@@ -809,6 +911,8 @@ def generate_config_for_server(server_index):
             auth_type = proxy_config.get('AUTH_TYPE', 'noauth')
             auth_user = proxy_config.get('AUTH_USER')
             auth_pass = proxy_config.get('AUTH_PASS')
+            socks5_port = int(proxy_config.get('SOCKS5_PORT', '1080'))
+            http_port = int(proxy_config.get('HTTP_PORT', '8080'))
     except:
         print("⚠️  未找到代理模式配置，使用默认设置")
 
@@ -818,11 +922,11 @@ def generate_config_for_server(server_index):
     selected_config = servers_data['servers'][server_index]
 
     if selected_config['protocol'] == 'vless':
-        v2ray_config = create_v2ray_config_vless(selected_config, proxy_mode, listen_ip, auth_type, auth_user, auth_pass)
+        v2ray_config = create_v2ray_config_vless(selected_config, proxy_mode, listen_ip, auth_type, auth_user, auth_pass, socks5_port, http_port)
     elif selected_config['protocol'] == 'vmess':
-        v2ray_config = create_v2ray_config_vmess(selected_config, proxy_mode, listen_ip, auth_type, auth_user, auth_pass)
+        v2ray_config = create_v2ray_config_vmess(selected_config, proxy_mode, listen_ip, auth_type, auth_user, auth_pass, socks5_port, http_port)
     elif selected_config['protocol'] == 'shadowsocks':
-        v2ray_config = create_v2ray_config_shadowsocks(selected_config, proxy_mode, listen_ip, auth_type, auth_user, auth_pass)
+        v2ray_config = create_v2ray_config_shadowsocks(selected_config, proxy_mode, listen_ip, auth_type, auth_user, auth_pass, socks5_port, http_port)
     else:
         return False
 
@@ -1108,6 +1212,14 @@ if [ ! -f config.json ]; then
     exit 1
 fi
 
+# 读取端口配置
+SOCKS5_PORT="1080"
+HTTP_PORT="8080"
+if [ -f proxy_config.txt ]; then
+    SOCKS5_PORT=$(grep "SOCKS5_PORT=" proxy_config.txt | cut -d'=' -f2 2>/dev/null || echo "1080")
+    HTTP_PORT=$(grep "HTTP_PORT=" proxy_config.txt | cut -d'=' -f2 2>/dev/null || echo "8080")
+fi
+
 # 显示当前服务器信息
 if [ -f servers_all.json ]; then
     CURRENT_SERVER=$(python3 -c "import json; data=json.load(open('servers_all.json')); print(data['servers'][data['current_server']]['remark'])" 2>/dev/null)
@@ -1134,12 +1246,12 @@ sleep 2
 # 验证启动
 if kill -0 $(cat v2ray.pid) 2>/dev/null; then
     echo "✅ V2Ray启动成功 (PID: $(cat v2ray.pid))"
-    echo "📡 SOCKS5代理: 127.0.0.1:1080"
-    echo "🌐 HTTP代理: 127.0.0.1:8080"
+    echo "📡 SOCKS5代理: 127.0.0.1:$SOCKS5_PORT"
+    echo "🌐 HTTP代理: 127.0.0.1:$HTTP_PORT"
     echo ""
     echo "💡 设置代理环境变量:"
-    echo "export http_proxy=http://127.0.0.1:8080"
-    echo "export https_proxy=http://127.0.0.1:8080"
+    echo "export http_proxy=http://127.0.0.1:$HTTP_PORT"
+    echo "export https_proxy=http://127.0.0.1:$HTTP_PORT"
 else
     echo "❌ V2Ray启动失败，请检查日志: tail -f v2ray.log"
     rm -f v2ray.pid
@@ -1188,6 +1300,14 @@ cd ~/v2ray
 
 echo "=== V2Ray 状态检查 ==="
 
+# 读取端口配置
+SOCKS5_PORT="1080"
+HTTP_PORT="8080"
+if [ -f proxy_config.txt ]; then
+    SOCKS5_PORT=$(grep "SOCKS5_PORT=" proxy_config.txt | cut -d'=' -f2 2>/dev/null || echo "1080")
+    HTTP_PORT=$(grep "HTTP_PORT=" proxy_config.txt | cut -d'=' -f2 2>/dev/null || echo "8080")
+fi
+
 # 显示当前服务器信息
 if [ -f servers_all.json ]; then
     echo "📋 服务器信息:"
@@ -1197,14 +1317,14 @@ fi
 
 if [ -f v2ray.pid ] && kill -0 $(cat v2ray.pid) 2>/dev/null; then
     echo "✅ V2Ray正在运行 (PID: $(cat v2ray.pid))"
-    echo "📡 SOCKS5代理: 127.0.0.1:1080"
-    echo "🌐 HTTP代理: 127.0.0.1:8080"
-    
+    echo "📡 SOCKS5代理: 127.0.0.1:$SOCKS5_PORT"
+    echo "🌐 HTTP代理: 127.0.0.1:$HTTP_PORT"
+
     # 检查端口占用
     if command -v netstat >/dev/null 2>&1; then
         echo ""
         echo "端口监听状态:"
-        netstat -tlnp 2>/dev/null | grep ":1080\|:8080" | head -2
+        netstat -tlnp 2>/dev/null | grep ":$SOCKS5_PORT\|:$HTTP_PORT" | head -2
     fi
 else
     echo "❌ V2Ray未运行"
@@ -1373,13 +1493,21 @@ if ! [ -f v2ray.pid ] || ! kill -0 $(cat v2ray.pid) 2>/dev/null; then
     sleep 2
 fi
 
+# 读取端口配置
+SOCKS5_PORT="1080"
+HTTP_PORT="8080"
+if [ -f proxy_config.txt ]; then
+    SOCKS5_PORT=$(grep "SOCKS5_PORT=" proxy_config.txt | cut -d'=' -f2 2>/dev/null || echo "1080")
+    HTTP_PORT=$(grep "HTTP_PORT=" proxy_config.txt | cut -d'=' -f2 2>/dev/null || echo "8080")
+fi
+
 # 设置代理环境变量
-export http_proxy=http://127.0.0.1:8080
-export https_proxy=http://127.0.0.1:8080
-export HTTP_PROXY=http://127.0.0.1:8080
-export HTTPS_PROXY=http://127.0.0.1:8080
-export ftp_proxy=http://127.0.0.1:8080
-export FTP_PROXY=http://127.0.0.1:8080
+export http_proxy=http://127.0.0.1:$HTTP_PORT
+export https_proxy=http://127.0.0.1:$HTTP_PORT
+export HTTP_PROXY=http://127.0.0.1:$HTTP_PORT
+export HTTPS_PROXY=http://127.0.0.1:$HTTP_PORT
+export ftp_proxy=http://127.0.0.1:$HTTP_PORT
+export FTP_PROXY=http://127.0.0.1:$HTTP_PORT
 export no_proxy="localhost,127.0.0.1,10.0.0.0/8,192.168.0.0/16,172.16.0.0/12"
 export NO_PROXY="localhost,127.0.0.1,10.0.0.0/8,192.168.0.0/16,172.16.0.0/12"
 
@@ -1503,24 +1631,24 @@ show_usage() {
             LOCAL_IP=$(hostname -I | awk '{print $1}' 2>/dev/null || echo "YOUR_IP")
             echo ""
             print_menu "🌐 代理设置 (局域网模式):"
-            echo "  SOCKS5: $LOCAL_IP:1080"
-            echo "  HTTP:   $LOCAL_IP:8080"
+            echo "  SOCKS5: $LOCAL_IP:$SOCKS5_PORT"
+            echo "  HTTP:   $LOCAL_IP:$HTTP_PORT"
             echo "  认证:   用户名密码认证"
             echo ""
             print_info "💡 局域网设备连接设置:"
-            echo "  SOCKS5代理地址: socks5://$AUTH_USER:$AUTH_PASS@$LOCAL_IP:1080"
-            echo "  HTTP代理地址:    http://$AUTH_USER:$AUTH_PASS@$LOCAL_IP:8080"
+            echo "  SOCKS5代理地址: socks5://$AUTH_USER:$AUTH_PASS@$LOCAL_IP:$SOCKS5_PORT"
+            echo "  HTTP代理地址:    http://$AUTH_USER:$AUTH_PASS@$LOCAL_IP:$HTTP_PORT"
         else
             print_info "🔒 代理模式: 本机代理"
             echo ""
             print_menu "🌐 代理设置 (本机模式):"
-            echo "  SOCKS5: 127.0.0.1:1080"
-            echo "  HTTP:   127.0.0.1:8080"
+            echo "  SOCKS5: 127.0.0.1:$SOCKS5_PORT"
+            echo "  HTTP:   127.0.0.1:$HTTP_PORT"
             echo "  认证:   无需认证"
             echo ""
             print_menu "📱 环境变量:"
-            echo "  export http_proxy=http://127.0.0.1:8080"
-            echo "  export https_proxy=http://127.0.0.1:8080"
+            echo "  export http_proxy=http://127.0.0.1:$HTTP_PORT"
+            echo "  export https_proxy=http://127.0.0.1:$HTTP_PORT"
         fi
     else
         print_menu "🌐 代理设置 (默认本机模式):"
