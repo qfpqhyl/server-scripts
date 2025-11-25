@@ -1530,21 +1530,27 @@ else
 fi
 EOF
 
-    # 创建连接脚本
-    cat > connect.sh << 'EOF'
+    # 创建代理开启脚本 - 写入bashrc版本
+    cat > proxy_on.sh << 'EOF'
 #!/bin/bash
+
+echo "=== V2Ray 代理启用 v3.1 ==="
+
+# 检查V2Ray是否运行
 cd ~/v2ray
-
-echo "=== V2Ray 快速连接 v3.0 ==="
-
-# 启动V2Ray（如果未运行）
 if ! [ -f v2ray.pid ] || ! kill -0 $(cat v2ray.pid) 2>/dev/null; then
-    echo "🚀 启动V2Ray..."
+    echo "🚀 启动V2Ray服务..."
     ./start.sh
     sleep 2
 fi
 
-# 读取端口配置 - 先检查本地，再检查主目录
+# 检查V2Ray是否成功启动
+if ! [ -f v2ray.pid ] || ! kill -0 $(cat v2ray.pid) 2>/dev/null; then
+    echo "❌ V2Ray启动失败，请检查配置"
+    exit 1
+fi
+
+# 读取端口配置
 SOCKS5_PORT="1080"
 HTTP_PORT="8080"
 
@@ -1562,18 +1568,39 @@ else
     echo "⚠️  未找到端口配置，使用默认端口: SOCKS5=1080, HTTP=8080"
 fi
 
-# 设置代理环境变量
+# 检查是否已经存在代理配置
+if grep -q "# V2Ray 代理环境变量" ~/.bashrc; then
+    echo "⚠️  检测到现有代理配置，将先清除旧配置"
+    # 清除旧的代理配置
+    sed -i '/# V2Ray 代理环境变量/,/# V2Ray 代理环境变量结束/d' ~/.bashrc
+fi
+
+# 写入代理环境变量到 .bashrc
+cat >> ~/.bashrc << BASHRC_EOF
+
+# V2Ray 代理环境变量
 export http_proxy=http://127.0.0.1:$HTTP_PORT
 export https_proxy=http://127.0.0.1:$HTTP_PORT
 export HTTP_PROXY=http://127.0.0.1:$HTTP_PORT
 export HTTPS_PROXY=http://127.0.0.1:$HTTP_PORT
-export ftp_proxy=http://127.0.0.1:$HTTP_PORT
-export FTP_PROXY=http://127.0.0.1:$HTTP_PORT
+export no_proxy="localhost,127.0.0.1,10.0.0.0/8,192.168.0.0/16,172.16.0.0/12"
+export NO_PROXY="localhost,127.0.0.1,10.0.0.0/8,192.168.0.0/16,172.16.0.0/12"
+# V2Ray 代理环境变量结束
+BASHRC_EOF
+
+echo "✅ 代理环境变量已写入 ~/.bashrc"
+
+# 立即生效环境变量
+export http_proxy=http://127.0.0.1:$HTTP_PORT
+export https_proxy=http://127.0.0.1:$HTTP_PORT
+export HTTP_PROXY=http://127.0.0.1:$HTTP_PORT
+export HTTPS_PROXY=http://127.0.0.1:$HTTP_PORT
 export no_proxy="localhost,127.0.0.1,10.0.0.0/8,192.168.0.0/16,172.16.0.0/12"
 export NO_PROXY="localhost,127.0.0.1,10.0.0.0/8,192.168.0.0/16,172.16.0.0/12"
 
-echo "✅ 代理环境变量已设置"
-echo "🌐 当前终端会话已连接代理"
+echo "✅ 当前会话环境变量已生效"
+echo "🌐 HTTP代理: http://127.0.0.1:$HTTP_PORT"
+echo "🌐 SOCKS5代理: socks5://127.0.0.1:$SOCKS5_PORT"
 
 # 显示当前服务器
 if [ -f servers_all.json ]; then
@@ -1584,22 +1611,104 @@ if [ -f servers_all.json ]; then
 fi
 
 echo ""
-echo "🔍 测试连接:"
+echo "🔍 测试代理连接:"
 if timeout 5 curl -s http://httpbin.org/ip >/dev/null 2>&1; then
     echo "✅ 代理连接正常"
     IP=$(timeout 5 curl -s http://httpbin.org/ip 2>/dev/null | grep -o '"origin": "[^"]*' | cut -d'"' -f4 2>/dev/null)
     if [ -n "$IP" ]; then
-        echo "🌍 当前IP: $IP"
+        echo "🌍 当前外网IP: $IP"
     fi
 else
     echo "❌ 代理连接失败，请检查配置"
+    echo "💡 运行 'v2status' 查看服务状态"
 fi
 
-# 启动一个新的bash会话，继承代理设置
 echo ""
-echo "💡 输入 'exit' 退出代理会话"
-echo "💡 可用命令: v2status, v2switch, v2update"
-bash
+echo "💡 环境变量已永久保存到 ~/.bashrc"
+echo "💡 新终端会话将自动生效"
+echo "💡 使用 'proxy_status' 查看代理状态"
+echo "💡 使用 'proxy_off' 移除代理配置"
+EOF
+
+    # 创建代理关闭脚本
+    cat > proxy_off.sh << 'EOF'
+#!/bin/bash
+
+echo "=== V2Ray 代理禁用 v3.1 ==="
+
+# 检查是否存在代理配置
+if grep -q "# V2Ray 代理环境变量" ~/.bashrc; then
+    echo "🗑️  正在从 ~/.bashrc 移除代理配置..."
+    # 移除代理配置
+    sed -i '/# V2Ray 代理环境变量/,/# V2Ray 代理环境变量结束/d' ~/.bashrc
+    echo "✅ 已从 ~/.bashrc 移除代理配置"
+else
+    echo "⚠️  未找到代理配置"
+fi
+
+# 清除当前会话的环境变量
+unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY NO_PROXY no_proxy
+echo "✅ 已清除当前会话的环境变量"
+
+echo ""
+echo "💡 代理配置已完全移除"
+echo "💡 新终端会话将不再使用代理"
+echo "💡 当前会话需运行 'source ~/.bashrc' 重新加载配置"
+EOF
+
+    # 创建代理状态检查脚本
+    cat > proxy_status.sh << 'EOF'
+#!/bin/bash
+
+echo "=== V2Ray 代理状态 v3.1 ==="
+
+# 检查.bashrc中是否有代理配置
+if grep -q "# V2Ray 代理环境变量" ~/.bashrc; then
+    echo "✅ .bashrc 中存在代理配置"
+
+    # 读取配置的端口
+    HTTP_PORT=$(grep -A 1 "# V2Ray 代理环境变量" ~/.bashrc | grep "HTTP_PROXY=" | cut -d':' -f3 | cut -d'/' -f3 2>/dev/null)
+    if [ -n "$HTTP_PORT" ]; then
+        echo "🌐 配置的HTTP代理端口: $HTTP_PORT"
+    fi
+else
+    echo "❌ .bashrc 中没有代理配置"
+fi
+
+echo ""
+echo "=== 当前会话环境变量 ==="
+echo "http_proxy: $http_proxy"
+echo "https_proxy: $https_proxy"
+echo "HTTP_PROXY: $HTTP_PROXY"
+echo "HTTPS_PROXY: $HTTPS_PROXY"
+
+echo ""
+echo "=== V2Ray 服务状态 ==="
+cd ~/v2ray
+if [ -f v2ray.pid ] && kill -0 $(cat v2ray.pid) 2>/dev/null; then
+    echo "✅ V2Ray 服务运行中 (PID: $(cat v2ray.pid))"
+
+    # 检查端口配置
+    if [ -f proxy_config.txt ]; then
+        SOCKS5_PORT=$(grep "SOCKS5_PORT=" proxy_config.txt | cut -d'=' -f2 2>/dev/null || echo "1080")
+        HTTP_PORT=$(grep "HTTP_PORT=" proxy_config.txt | cut -d'=' -f2 2>/dev/null || echo "8080")
+        echo "📡 V2Ray 端口配置: SOCKS5=$SOCKS5_PORT, HTTP=$HTTP_PORT"
+    fi
+else
+    echo "❌ V2Ray 服务未运行"
+fi
+
+echo ""
+echo "💡 使用 'proxy_on' 启用代理"
+echo "💡 使用 'proxy_off' 禁用代理"
+EOF
+
+    # 创建简化的connect.sh脚本（向后兼容）
+    cat > connect.sh << 'EOF'
+#!/bin/bash
+echo "⚠️  connect.sh 已弃用，请使用 proxy_on 命令"
+echo "正在执行 proxy_on..."
+~/v2ray/proxy_on.sh
 EOF
 
     # 设置执行权限
@@ -1643,12 +1752,11 @@ create_aliases() {
     
     cat >> ~/.bashrc << 'EOF'
 
-# V2Ray 完整版管理别名 v3.0
+# V2Ray 完整版管理别名 v3.1
 alias v2start="cd ~/v2ray && ./start.sh"
 alias v2stop="cd ~/v2ray && ./stop.sh"
 alias v2status="cd ~/v2ray && ./status.sh"
 alias v2restart="cd ~/v2ray && ./restart.sh"
-alias v2connect="cd ~/v2ray && ./connect.sh"
 alias v2switch="cd ~/v2ray && ./switch.sh"
 alias v2update="cd ~/v2ray && ./update.sh"
 alias v2log="cd ~/v2ray && tail -f v2ray.log"
@@ -1658,10 +1766,10 @@ alias v2vless="cd ~/v2ray && python3 server_manager.py vless"
 alias v2ss="cd ~/v2ray && python3 server_manager.py ss"
 alias v2scan="cd ~/v2ray && python3 full_parser.py"
 
-# 代理管理别名
-alias proxy_on="cd ~/v2ray && ./connect.sh"
-alias proxy_off="unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY FTP_PROXY ftp_proxy NO_PROXY no_proxy"
-alias proxy_status='echo "HTTP_PROXY: $HTTP_PROXY"; echo "HTTPS_PROXY: $HTTPS_PROXY"'
+# 代理管理别名 - bashrc版本
+alias proxy_on='~/v2ray/proxy_on.sh'
+alias proxy_off='~/v2ray/proxy_off.sh'
+alias proxy_status='~/v2ray/proxy_status.sh'
 EOF
 
     print_success "别名配置完成"
@@ -1748,7 +1856,7 @@ show_usage() {
     echo "  v2stop      - 停止服务"
     echo "  v2status    - 查看状态"
     echo "  v2restart   - 重启服务"
-    echo "  v2connect   - 快速连接代理"
+    echo "  proxy_on    - 启用代理"
     echo ""
     print_menu "⚡ 服务器管理:"
     echo "  v2switch    - 切换服务器"
@@ -1761,7 +1869,12 @@ show_usage() {
     echo ""
     print_menu "🔄 服务器重启后:"
     echo "  1. 运行: v2start"
-    echo "  2. 连接代理: v2connect"
+    echo "  2. 启用代理: proxy_on"
+    echo ""
+    print_menu "💡 代理管理:"
+    echo "  proxy_on    - 启用代理"
+    echo "  proxy_off   - 禁用代理"
+    echo "  proxy_status- 查看代理状态"
     echo ""
     print_warning "⚡ 请运行 'source ~/.bashrc' 来加载别名配置"
     echo ""

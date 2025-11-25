@@ -138,10 +138,9 @@ v2ss             # 列出Shadowsocks服务器
 v2update         # 更新订阅
 v2scan           # 重新解析订阅
 
-# 代理连接
-v2connect        # 快速连接代理（启动服务+设置环境变量）
-proxy_on         # 开启代理（等同于v2connect）
-proxy_off        # 关闭代理（清除环境变量）
+# 代理管理（简化版本）
+proxy_on         # 启用代理（设置环境变量）
+proxy_off        # 禁用代理（清除环境变量）
 proxy_status     # 查看代理状态
 ```
 
@@ -167,17 +166,22 @@ proxy_status     # 查看代理状态
 # 使用proxy_on命令自动设置（推荐）
 proxy_on
 
-# 或手动设置（替换PORT为你的HTTP代理端口）
-export http_proxy=http://127.0.0.1:PORT
-export https_proxy=http://127.0.0.1:PORT
-export HTTP_PROXY=http://127.0.0.1:PORT
-export HTTPS_PROXY=http://127.0.0.1:PORT
+# 手动查看当前配置（用于调试）
+proxy_status
 
-# 关闭代理
+# 手动移除代理配置
 proxy_off
-# 或手动关闭
-unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
+
+# 手动重新加载配置（如果修改了.bashrc）
+source ~/.bashrc
 ```
+
+**说明：**
+- `proxy_on` 会自动将代理配置写入 `~/.bashrc` 并立即生效
+- 所有新终端会话将自动继承代理设置
+- `proxy_off` 会完全移除代理配置
+- 环境变量包括：`http_proxy`, `https_proxy`, `HTTP_PROXY`, `HTTPS_PROXY`, `no_proxy`, `NO_PROXY`
+- 仅包含HTTP/HTTPS代理，移除了FTP相关配置
 
 ### DNS 配置
 
@@ -257,13 +261,18 @@ A: 端口信息保存在 `~/v2ray/proxy_config.txt` 文件中，可以：
 2. 重新运行安装脚本进行配置
 3. 手动编辑后运行 `v2restart` 重启服务
 
-### Q: proxy_on 和 v2connect 有什么区别？
+### Q: 如何使用代理？
 
 A:
 
-- `v2connect`: 启动 V2Ray 服务并设置代理环境变量
-- `proxy_on`: 完全等同于 `v2connect`，是简化的别名
-- 推荐使用 `proxy_on`，更简洁易记
+- `proxy_on`: 启用代理（自动启动V2Ray服务，将环境变量写入 `~/.bashrc` 并立即生效）
+- `proxy_off`: 禁用代理（从 `~/.bashrc` 移除代理配置并清除当前会话环境变量）
+- `proxy_status`: 查看代理状态（显示 `~/.bashrc` 配置和当前会话状态）
+
+**工作机制**:
+- 代理环境变量被永久保存到 `~/.bashrc` 文件中
+- 所有新打开的终端会话将自动使用代理配置
+- 无需在每个新终端中重复设置代理
 
 ### Q: 环境变量代理不生效怎么办？
 
