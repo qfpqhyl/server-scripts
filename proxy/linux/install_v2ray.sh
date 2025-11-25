@@ -292,17 +292,25 @@ setup_port_config() {
 
 # 保存代理模式配置
 save_proxy_config() {
-    cat > proxy_config.txt << EOF
-PROXY_MODE=$PROXY_MODE
+    # 创建配置内容
+    CONFIG_CONTENT="PROXY_MODE=$PROXY_MODE
 LISTEN_IP=$LISTEN_IP
 AUTH_TYPE=$AUTH_TYPE
 SOCKS5_PORT=$SOCKS5_PORT
-HTTP_PORT=$HTTP_PORT
-EOF
+HTTP_PORT=$HTTP_PORT"
 
     if [[ "$AUTH_TYPE" == "password" ]]; then
-        echo "AUTH_USER=$PROXY_USER" >> proxy_config.txt
-        echo "AUTH_PASS=$PROXY_PASS" >> proxy_config.txt
+        CONFIG_CONTENT="$CONFIG_CONTENT
+AUTH_USER=$PROXY_USER
+AUTH_PASS=$PROXY_PASS"
+    fi
+
+    # 保存到当前目录
+    echo "$CONFIG_CONTENT" > proxy_config.txt
+
+    # 同时保存到最终安装目录（如果存在）
+    if [[ -n "$V2RAY_DIR" ]]; then
+        echo "$CONFIG_CONTENT" > "$V2RAY_DIR/proxy_config.txt" 2>/dev/null || true
     fi
 }
 
@@ -371,9 +379,9 @@ setup_auth_credentials() {
 # 创建安装目录
 create_directories() {
     print_info "创建安装目录..."
-    
+
     V2RAY_DIR="$HOME/v2ray"
-    
+
     if [[ -d "$V2RAY_DIR" ]]; then
         print_warning "目录 $V2RAY_DIR 已存在"
         read -p "是否删除现有目录并重新安装? (y/N): " -n 1 -r
@@ -390,8 +398,15 @@ create_directories() {
             exit 1
         fi
     fi
-    
+
     mkdir -p "$V2RAY_DIR"
+
+    # 复制已存在的配置文件到新目录
+    if [[ -f "proxy_config.txt" ]]; then
+        cp proxy_config.txt "$V2RAY_DIR/"
+        print_success "已复制代理配置到安装目录"
+    fi
+
     cd "$V2RAY_DIR"
     print_success "创建目录: $V2RAY_DIR"
 }
@@ -911,10 +926,28 @@ def generate_config_for_server(server_index):
             auth_type = proxy_config.get('AUTH_TYPE', 'noauth')
             auth_user = proxy_config.get('AUTH_USER')
             auth_pass = proxy_config.get('AUTH_PASS')
-            socks5_port = int(proxy_config.get('SOCKS5_PORT', '1080'))
-            http_port = int(proxy_config.get('HTTP_PORT', '8080'))
-    except:
-        print("⚠️  未找到代理模式配置，使用默认设置")
+
+            # 安全地转换端口为整数
+            try:
+                socks5_port = int(proxy_config.get('SOCKS5_PORT', '1080'))
+            except (ValueError, TypeError):
+                socks5_port = 1080
+                print("⚠️  SOCKS5端口格式错误，使用默认值1080")
+
+            try:
+                http_port = int(proxy_config.get('HTTP_PORT', '8080'))
+            except (ValueError, TypeError):
+                http_port = 8080
+                print("⚠️  HTTP端口格式错误，使用默认值8080")
+
+            print(f"📡 读取到端口配置: SOCKS5={socks5_port}, HTTP={http_port}")
+
+    except FileNotFoundError:
+        print("⚠️  未找到proxy_config.txt，使用默认设置")
+        print(f"📡 使用默认端口: SOCKS5={socks5_port}, HTTP={http_port}")
+    except Exception as e:
+        print(f"⚠️  读取代理配置时出错: {e}")
+        print(f"📡 使用默认端口: SOCKS5={socks5_port}, HTTP={http_port}")
 
     if server_index >= len(servers_data['servers']):
         return False
