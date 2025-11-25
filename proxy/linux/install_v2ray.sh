@@ -1248,9 +1248,15 @@ fi
 # 读取端口配置
 SOCKS5_PORT="1080"
 HTTP_PORT="8080"
+
+# 优先读取当前目录的配置
 if [ -f proxy_config.txt ]; then
     SOCKS5_PORT=$(grep "SOCKS5_PORT=" proxy_config.txt | cut -d'=' -f2 2>/dev/null || echo "1080")
     HTTP_PORT=$(grep "HTTP_PORT=" proxy_config.txt | cut -d'=' -f2 2>/dev/null || echo "8080")
+# 如果本地没有，尝试从主目录读取
+elif [ -f ~/proxy_config.txt ]; then
+    SOCKS5_PORT=$(grep "SOCKS5_PORT=" ~/proxy_config.txt | cut -d'=' -f2 2>/dev/null || echo "1080")
+    HTTP_PORT=$(grep "HTTP_PORT=" ~/proxy_config.txt | cut -d'=' -f2 2>/dev/null || echo "8080")
 fi
 
 # 显示当前服务器信息
@@ -1336,9 +1342,15 @@ echo "=== V2Ray 状态检查 ==="
 # 读取端口配置
 SOCKS5_PORT="1080"
 HTTP_PORT="8080"
+
+# 优先读取当前目录的配置
 if [ -f proxy_config.txt ]; then
     SOCKS5_PORT=$(grep "SOCKS5_PORT=" proxy_config.txt | cut -d'=' -f2 2>/dev/null || echo "1080")
     HTTP_PORT=$(grep "HTTP_PORT=" proxy_config.txt | cut -d'=' -f2 2>/dev/null || echo "8080")
+# 如果本地没有，尝试从主目录读取
+elif [ -f ~/proxy_config.txt ]; then
+    SOCKS5_PORT=$(grep "SOCKS5_PORT=" ~/proxy_config.txt | cut -d'=' -f2 2>/dev/null || echo "1080")
+    HTTP_PORT=$(grep "HTTP_PORT=" ~/proxy_config.txt | cut -d'=' -f2 2>/dev/null || echo "8080")
 fi
 
 # 显示当前服务器信息
@@ -1497,7 +1509,13 @@ fi
 echo "🔍 解析订阅..."
 if python3 full_parser.py; then
     echo "✅ 订阅解析成功"
-    
+
+    # 同步代理配置文件
+    if [ -f ~/proxy_config.txt ] && [ ! -f proxy_config.txt ]; then
+        cp ~/proxy_config.txt ./
+        echo "✅ 已同步代理配置文件"
+    fi
+
     # 询问是否重启
     read -p "是否立即重启V2Ray应用新配置? (y/N): " -n 1 -r
     echo
@@ -1526,12 +1544,22 @@ if ! [ -f v2ray.pid ] || ! kill -0 $(cat v2ray.pid) 2>/dev/null; then
     sleep 2
 fi
 
-# 读取端口配置
+# 读取端口配置 - 先检查本地，再检查主目录
 SOCKS5_PORT="1080"
 HTTP_PORT="8080"
+
+# 优先读取当前目录的配置
 if [ -f proxy_config.txt ]; then
     SOCKS5_PORT=$(grep "SOCKS5_PORT=" proxy_config.txt | cut -d'=' -f2 2>/dev/null || echo "1080")
     HTTP_PORT=$(grep "HTTP_PORT=" proxy_config.txt | cut -d'=' -f2 2>/dev/null || echo "8080")
+    echo "✅ 从当前目录读取端口配置: SOCKS5=$SOCKS5_PORT, HTTP=$HTTP_PORT"
+# 如果本地没有，尝试从主目录读取
+elif [ -f ~/proxy_config.txt ]; then
+    SOCKS5_PORT=$(grep "SOCKS5_PORT=" ~/proxy_config.txt | cut -d'=' -f2 2>/dev/null || echo "1080")
+    HTTP_PORT=$(grep "HTTP_PORT=" ~/proxy_config.txt | cut -d'=' -f2 2>/dev/null || echo "8080")
+    echo "✅ 从主目录读取端口配置: SOCKS5=$SOCKS5_PORT, HTTP=$HTTP_PORT"
+else
+    echo "⚠️  未找到端口配置，使用默认端口: SOCKS5=1080, HTTP=8080"
 fi
 
 # 设置代理环境变量
@@ -1578,6 +1606,29 @@ EOF
     chmod +x *.sh
     
     print_success "管理脚本创建完成"
+}
+
+# 同步代理配置文件
+sync_proxy_config() {
+    print_info "同步代理配置文件..."
+
+    # 如果主目录有配置文件但安装目录没有，则复制
+    if [[ -f ~/proxy_config.txt ]] && [[ ! -f proxy_config.txt ]]; then
+        cp ~/proxy_config.txt ./
+        print_success "已同步主目录配置文件到安装目录"
+    fi
+
+    # 如果安装目录有配置文件，也确保主目录有备份
+    if [[ -f proxy_config.txt ]] && [[ ! -f ~/proxy_config.txt ]]; then
+        cp proxy_config.txt ~/proxy_config.txt
+        print_success "已备份配置文件到主目录"
+    fi
+
+    # 显示最终配置
+    if [[ -f proxy_config.txt ]]; then
+        source proxy_config.txt
+        print_success "当前端口配置: SOCKS5=$SOCKS5_PORT, HTTP=$HTTP_PORT"
+    fi
 }
 
 # 创建别名配置
@@ -1775,6 +1826,9 @@ main() {
 
     # 创建管理脚本
     create_management_scripts
+
+    # 确保配置文件同步到安装目录
+    sync_proxy_config
 
     # 创建别名
     create_aliases
