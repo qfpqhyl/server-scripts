@@ -113,7 +113,12 @@ source ~/.bashrc
 unset http_proxy https_proxy
 ```
 
-执行 `proxy_on` 启动服务和设置环境变量。
+运行以下命令设置和更新环境变量：
+
+```bash
+proxy_on
+source ~/.bashrc
+```
 
 ## 基本管理命令
 
@@ -177,11 +182,12 @@ source ~/.bashrc
 ```
 
 **说明：**
+
 - `proxy_on` 会自动将代理配置写入 `~/.bashrc` 并立即生效
 - 所有新终端会话将自动继承代理设置
 - `proxy_off` 会完全移除代理配置
 - 环境变量包括：`http_proxy`, `https_proxy`, `HTTP_PROXY`, `HTTPS_PROXY`, `no_proxy`, `NO_PROXY`
-- 仅包含HTTP/HTTPS代理，移除了FTP相关配置
+- 仅包含 HTTP/HTTPS 代理，移除了 FTP 相关配置
 
 ### DNS 配置
 
@@ -265,11 +271,12 @@ A: 端口信息保存在 `~/v2ray/proxy_config.txt` 文件中，可以：
 
 A:
 
-- `proxy_on`: 启用代理（自动启动V2Ray服务，将环境变量写入 `~/.bashrc` 并立即生效）
+- `proxy_on`: 启用代理（自动启动 V2Ray 服务，将环境变量写入 `~/.bashrc` 并立即生效）
 - `proxy_off`: 禁用代理（从 `~/.bashrc` 移除代理配置并清除当前会话环境变量）
 - `proxy_status`: 查看代理状态（显示 `~/.bashrc` 配置和当前会话状态）
 
 **工作机制**:
+
 - 代理环境变量被永久保存到 `~/.bashrc` 文件中
 - 所有新打开的终端会话将自动使用代理配置
 - 无需在每个新终端中重复设置代理
