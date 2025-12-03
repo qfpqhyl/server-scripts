@@ -28,14 +28,6 @@
 
 ---
 
-<div align="center">
-
-**[⬆ 回到顶部](#-一站式-linux-服务器配置与环境部署)**
-
-Made with ❤️ for Chinese developers & researchers
-
-</div>
-
-> MIT License
->
-> Copyright (c) 2023 秋风飘起黄叶落
+<p align="right">
+  MIT License &copy; 2025 秋风飘起黄叶落
+</p>
