@@ -4,7 +4,6 @@
 ![Bash](https://img.shields.io/badge/Bash-5.0+-blue?style=flat-square&logo=gnu-bash&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
 ![Development Status](https://img.shields.io/badge/Status-Active%20Development-yellow?style=flat-square)
-![V2Ray](https://img.shields.io/badge/V2Ray-✅%20Completed-brightgreen?style=flat-square)
 
 **面向国内开发者与科研人员的快速部署工具**
 
@@ -21,22 +20,11 @@
 - ⚡ **性能优化**: 系统参数调优，资源使用优化
 - 🛡️ **安全加固**: 基础安全配置，防火墙设置
 
-## 📄 许可证
-
-本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情
-
 ## ⭐ Star History
 
 如果这个项目对你有帮助，请给个 Star 支持一下！
 
-## 🙏 致谢
-
-感谢以下开源项目：
-
-- [V2Ray](https://github.com/v2fly/v2ray-core)
-- [sing-box](https://github.com/SagerNet/sing-box)
-- [Hysteria2](https://github.com/apernet/hysteria)
-- [Docker](https://github.com/docker/docker-ce)
+[![Star History Chart](https://api.star-history.com/svg?repos=qfpqhyl/server-scripts&type=Date)](https://star-history.com/#qfpqhyl/server-scripts&Date)
 
 ---
 
@@ -47,3 +35,7 @@
 Made with ❤️ for Chinese developers & researchers
 
 </div>
+
+> MIT License
+>
+> Copyright (c) 2023 秋风飘起黄叶落
