@@ -378,16 +378,11 @@ download_subscription() {
     print_success "订阅内容验证通过"
 }
 
-# 复制解析脚本（与Linux版本相同）
-# 这里直接从Linux版本复制full_parser.py的内容
+# 创建订阅解析脚本（与Linux版本相同的逻辑）
 create_parser_script() {
     print_info "创建订阅解析脚本..."
     
-    # 检查是否可以从Linux版本复制
-    LINUX_PARSER="/home/runner/work/server-scripts/server-scripts/proxy/linux/install_v2ray.sh"
-    
-    # 创建与Linux版本相同的解析器
-    # 为了避免代码重复，这里使用相同的Python脚本逻辑
+    # 创建订阅解析器
     cat > full_parser.py << 'PARSER_EOF'
 #!/usr/bin/env python3
 import base64

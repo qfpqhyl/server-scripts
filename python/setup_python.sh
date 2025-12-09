@@ -332,25 +332,15 @@ configure_pip_mirrors() {
     # 创建 pip 配置目录
     mkdir -p ~/.pip
     
+    # 提取主机名（移除协议和路径）
+    PIP_HOST=$(echo $PIP_MIRROR | sed 's|https://||' | sed 's|http://||' | cut -d'/' -f1)
+    
     # 写入配置
     cat > ~/.pip/pip.conf <<EOF
 [global]
 index-url = $PIP_MIRROR
-trusted-host = ${PIP_MIRROR#https://}
-trusted-host = ${PIP_MIRROR#http://}
-EOF
-    
-    # 移除协议部分
-    sed -i 's|https://||g' ~/.pip/pip.conf
-    sed -i 's|http://||g' ~/.pip/pip.conf
-    sed -i 's|/simple.*||g' ~/.pip/pip.conf
-    
-    # 重新写入正确格式
-    cat > ~/.pip/pip.conf <<EOF
-[global]
-index-url = $PIP_MIRROR
 [install]
-trusted-host = $(echo $PIP_MIRROR | sed 's|https://||' | sed 's|http://||' | cut -d'/' -f1)
+trusted-host = $PIP_HOST
 EOF
     
     print_success "pip 镜像源配置完成"

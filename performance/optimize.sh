@@ -90,10 +90,11 @@ backup_configs() {
 optimize_kernel() {
     print_info "优化内核参数..."
     
-    cat > /tmp/99-performance.conf <<'EOF'
+    CURRENT_DATE=$(date)
+    cat > /tmp/99-performance.conf <<EOF
 # ===============================================
 # Linux 性能优化配置
-# 生成时间: $(date)
+# 生成时间: $CURRENT_DATE
 # ===============================================
 
 # ===============================================
